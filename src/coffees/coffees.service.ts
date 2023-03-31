@@ -4,17 +4,22 @@ import { Repository } from 'typeorm';
 import { CreateCoffeeDto } from './dto/create-coffee.dto/create-coffee.dto';
 import { PatchCoffeeDto } from './dto/patch-coffee.dto/patch-coffee.dto';
 import { Coffee } from './models/Coffee.model';
+import { Flavor } from './models/Flavor.model.ts';
 
 @Injectable()
 export class CoffeesService {
 
-  constructor(@InjectRepository(Coffee) private readonly coffeeRepository: Repository<Coffee>) { };
+  constructor(
+    @InjectRepository(Coffee) private readonly coffeeRepository: Repository<Coffee>,
+    @InjectRepository(Flavor) private readonly flavorRepository: Repository<Flavor>
+  ) { };
 
   async findById(id: String) {
     const foundItem = await this.coffeeRepository.findOne({
       where: {
         id: Number(id)
-      }
+      },
+      relations: ['flavor']
     })
 
     if (!foundItem) {
@@ -25,7 +30,25 @@ export class CoffeesService {
   }
 
   findAll() {
-    return this.coffeeRepository.find();
+    return this.coffeeRepository.find({
+      relations: ['flavor']
+    });
+  }
+
+  async findOrCreateFlavor(name: string): Promise<Flavor> {
+    const foundFlavor = await this.flavorRepository.findOne({
+      where: {
+        name
+      }
+    });
+
+    if (foundFlavor) {
+      return foundFlavor;
+    }
+    const newFlavor = this.flavorRepository.create({ name });
+
+    return newFlavor;
+
   }
 
   async updateItem(id: string, item: PatchCoffeeDto) {
@@ -35,15 +58,32 @@ export class CoffeesService {
       throw new NotFoundException(`Coffee with id: ${id} not found.`);
     }
 
-    await this.coffeeRepository.update(id, item)
-
+    const flavor = item?.flavor && await this.findOrCreateFlavor(item?.flavor);
+    await this.coffeeRepository.preload({
+      id: +id,
+      ...item,
+      flavor
+    })
     return item;
   }
 
-  create(createCoffeeDto: CreateCoffeeDto) {
+  async create(createCoffeeDto: CreateCoffeeDto) {
+    console.log(createCoffeeDto);
 
-    const newItem = this.coffeeRepository.create(createCoffeeDto);
-    return this.coffeeRepository.save(newItem);
+    const flavor = await this.findOrCreateFlavor(createCoffeeDto.flavor);
+    console.log(flavor);
 
+
+    const newItem = this.coffeeRepository.create(
+      {
+        ...createCoffeeDto,
+        flavor
+      }
+    );
+    return await this.coffeeRepository.save(newItem);
+  }
+
+  async delete(id: string) {
+    return this.coffeeRepository.delete(id)
   }
 }

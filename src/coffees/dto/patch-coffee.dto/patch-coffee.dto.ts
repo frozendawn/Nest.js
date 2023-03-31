@@ -8,4 +8,8 @@ export class PatchCoffeeDto {
   @IsString()
   @IsOptional()
   readonly description?: string;
+
+  @IsString()
+  @IsOptional()
+  readonly flavor?: string;
 }

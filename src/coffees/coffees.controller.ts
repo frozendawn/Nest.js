@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpException, HttpStatus, NotFoundException, Param, Post } from '@nestjs/common';
-import { Patch, Res } from '@nestjs/common/decorators';
+import { Delete, Patch, Res } from '@nestjs/common/decorators';
 import { CoffeesService } from './coffees.service';
 import { CreateCoffeeDto } from './dto/create-coffee.dto/create-coffee.dto';
 import { PatchCoffeeDto } from './dto/patch-coffee.dto/patch-coffee.dto';
@@ -28,8 +28,19 @@ export class CoffeesController {
 
   @Patch(':id')
   patchCoffee(@Param('id') id: string, @Body() patchCoffeeDto: PatchCoffeeDto) {
-
     return this.coffeeService.updateItem(id, patchCoffeeDto);
+  }
 
+  @Delete(':id')
+  async removeCoffee(@Param('id') id: string) {
+
+    const foundItem = await this.findOne(id);
+
+    if(!foundItem) {
+      throw new NotFoundException(`Coffee with id: ${id} not found.`)
+    }
+
+    await this.coffeeService.delete(id);
+    return foundItem;
   }
 }
