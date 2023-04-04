@@ -1,17 +1,20 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { CreateCoffeeDto } from './dto/create-coffee.dto/create-coffee.dto';
 import { PatchCoffeeDto } from './dto/patch-coffee.dto/patch-coffee.dto';
 import { Coffee } from './models/Coffee.model';
 import { Flavor } from './models/Flavor.model.ts';
+import { PaginationQueryDto } from './common/pagination-query.dto/pagination-query.dto';
+import { Event } from 'src/events/entities/event.entity/event.entity';
 
 @Injectable()
 export class CoffeesService {
 
   constructor(
     @InjectRepository(Coffee) private readonly coffeeRepository: Repository<Coffee>,
-    @InjectRepository(Flavor) private readonly flavorRepository: Repository<Flavor>
+    @InjectRepository(Flavor) private readonly flavorRepository: Repository<Flavor>,
+    private readonly connection: DataSource
   ) { };
 
   async findById(id: String) {
@@ -29,9 +32,12 @@ export class CoffeesService {
     return foundItem;
   }
 
-  findAll() {
+  findAll(paginationQuery: PaginationQueryDto) {
+    const { limit, offset } = paginationQuery;
     return this.coffeeRepository.find({
-      relations: ['flavor']
+      relations: ['flavor'],
+      skip: offset,
+      take: limit
     });
   }
 
@@ -81,6 +87,32 @@ export class CoffeesService {
       }
     );
     return await this.coffeeRepository.save(newItem);
+  }
+
+  async recommendCoffee(coffee: Coffee) {
+    const queryRunner = this.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      coffee.recommendations++;
+
+      const recommendEvent = new Event();
+      recommendEvent.name = 'recommend_coffee';
+      recommendEvent.type = 'coffee';
+      recommendEvent.payload = { coffeeId: coffee.id };
+
+      await queryRunner.manager.save(coffee)
+      await queryRunner.manager.save(recommendEvent)
+
+      await queryRunner.commitTransaction();
+
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+    }
+    finally {
+      await queryRunner.release();
+    }
   }
 
   async delete(id: string) {

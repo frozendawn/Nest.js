@@ -1,8 +1,9 @@
-import { Body, Controller, Get, HttpCode, HttpException, HttpStatus, NotFoundException, Param, Post } from '@nestjs/common';
-import { Delete, Patch, Res } from '@nestjs/common/decorators';
+import { Body, Controller, Get, HttpCode, HttpException, HttpStatus, InternalServerErrorException, NotFoundException, Param, Post } from '@nestjs/common';
+import { Delete, Patch, Query, Res } from '@nestjs/common/decorators';
 import { CoffeesService } from './coffees.service';
 import { CreateCoffeeDto } from './dto/create-coffee.dto/create-coffee.dto';
 import { PatchCoffeeDto } from './dto/patch-coffee.dto/patch-coffee.dto';
+import { PaginationQueryDto } from './common/pagination-query.dto/pagination-query.dto';
 
 
 @Controller('coffees')
@@ -11,8 +12,8 @@ export class CoffeesController {
   constructor(private readonly coffeeService: CoffeesService) {};
 
   @Get()
-  findALl() {
-    return this.coffeeService.findAll();
+  findALl(@Query() paginationQuery: PaginationQueryDto) {
+    return this.coffeeService.findAll(paginationQuery);
   }
 
   @Get(':id')
@@ -42,5 +43,22 @@ export class CoffeesController {
 
     await this.coffeeService.delete(id);
     return foundItem;
+  }
+
+  @Get('/recommend/:id')
+  async recommendCoffee(@Param('id') id) {
+    const foundCoffee = await this.coffeeService.findById(id);
+
+    if (!foundCoffee) {
+      throw new NotFoundException("Coffee not found");
+    }
+
+    try {
+      await this.coffeeService.recommendCoffee(foundCoffee);
+    } catch (error) {
+      throw new InternalServerErrorException("Error occured while trying to add recomendation please try again later!")
+    }
+    return foundCoffee
+    
   }
 }

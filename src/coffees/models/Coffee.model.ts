@@ -12,6 +12,9 @@ export class Coffee {
   @Column()
   description: string;
 
+  @Column({ default: 0 })
+  recommendations: number;
+
   @ManyToOne(
     () => Flavor,
     (flavor) => flavor.name, 
